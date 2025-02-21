@@ -1,12 +1,18 @@
+/**
+ * @fileoverview A simple blockchain demo that creates a block by finding a nonce such that the SHA256 hash
+ * has a configurable number of leading zero bits. The block contains data, nonce, and a timestamp,
+ * is stored in JSON format, and can be verified.
+ */
+
 const crypto = require("crypto");
 const fs = require("fs");
 
 /**
- * Check if a given hash (as a Buffer) has at least the specified number
- * of leading zero bits.
+ * Checks if the given SHA256 hash buffer has at least the specified number of leading zero bits.
+ *
  * @param {Buffer} hashBuffer - The SHA256 hash as a Buffer.
- * @param {number} zeros - Required number of leading zero bits.
- * @returns {boolean} - True if condition is met.
+ * @param {number} zeros - The required number of leading zero bits.
+ * @returns {boolean} True if the hash has at least the specified number of leading zero bits.
  */
 function hasLeadingZeroBits(hashBuffer, zeros) {
   let count = 0;
@@ -25,20 +31,20 @@ function hasLeadingZeroBits(hashBuffer, zeros) {
 }
 
 /**
- * Creates a new block for the given data.
- * The block is found by appending a nonce to the data such that:
- *   SHA256(Data + nonce) has at least "startingZeros" leading zero bits.
+ * Creates a new block for the given data by finding a nonce such that
+ * SHA256(data + timestamp + nonce) has at least the specified number of leading zero bits.
+ *
  * @param {string} data - The text data for the block.
- * @param {number} startingZeros - The required number of starting zero bits.
- * @returns {object} - The block object containing hash, data, and nonce.
+ * @param {number} startingZeros - The required number of leading zero bits in the resulting hash.
+ * @returns {Object} The block object containing the block hash, data, nonce, and timestamp.
  */
 function createBlock(data, startingZeros) {
-  let nonce = 0;
-  let hash;
-  let hashBuffer;
-
+  let nonce = 0,
+    hash,
+    hashBuffer;
+  const timestamp = Date.now();
   while (true) {
-    const combined = data + nonce;
+    const combined = data + timestamp + nonce;
     hashBuffer = crypto.createHash("sha256").update(combined).digest();
     hash = hashBuffer.toString("hex");
     if (hasLeadingZeroBits(hashBuffer, startingZeros)) {
@@ -47,29 +53,23 @@ function createBlock(data, startingZeros) {
     }
     nonce++;
   }
-
-  const block = {
-    hash: hash,
-    data: data,
-    nonce: nonce,
-  };
-  return block;
+  return { hash, data, nonce, timestamp };
 }
 
 /**
- * Verifies a block stored in a JSON file.
- * It recalculates the hash from the stored data and nonce, and compares it with the block hash.
- * @param {string} filePath - Path to the file containing the block JSON.
- * @returns {boolean} - True if the block is valid; otherwise false.
+ * Verifies a block stored in a JSON file by recalculating the hash using the stored data, timestamp, and nonce,
+ * and comparing it to the stored hash.
+ *
+ * @param {string} filePath - The file path of the JSON file containing the block.
+ * @returns {boolean} True if the block is valid; otherwise, false.
  */
 function verifyBlock(filePath) {
   try {
-    const fileData = fs.readFileSync(filePath, "utf8");
-    const block = JSON.parse(fileData);
-    const { hash, data, nonce } = block;
+    const block = JSON.parse(fs.readFileSync(filePath, "utf8"));
+    const { hash, data, nonce, timestamp } = block;
     const computedHash = crypto
       .createHash("sha256")
-      .update(data + nonce)
+      .update(data + timestamp + nonce)
       .digest("hex");
     if (computedHash === hash) {
       console.log("Block is valid.");
